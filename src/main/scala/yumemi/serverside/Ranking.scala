@@ -22,7 +22,7 @@ object Main extends Ranking {
     // 2つの関数(processFile, extractTop10)を合成した関数に処理対象のファイルを渡して呼び出している
     (processFile _ andThen extractTop10)(new File(fileName)).foreach(ranking => {
       val (rank, scores) = ranking // Tuple2の要素をパターンマッチで抽出
-      println(s"${rank},${scores.playerId},${scores.meanScore}")
+      println(s"$rank,${scores.playerId},${scores.meanScore}")
     })
   }
 }
@@ -50,7 +50,7 @@ trait Ranking {
     def _extractTop10(rank: Int, top10: List[(Int, Scores)], others: List[Scores]): List[(Int, Scores)] = {
       val lastMeanScore = if (top10.isEmpty) Int.MaxValue else top10.last._2.meanScore
       others match {
-        case head :: tail if (top10.size <= 10 || head.meanScore == lastMeanScore) =>
+        case head :: tail if top10.size <= 10 || head.meanScore == lastMeanScore =>
           val nextRank = if (head.meanScore < lastMeanScore) top10.size + 1 else rank
           _extractTop10(nextRank, top10 :+ (nextRank, head), tail)
         case Nil => top10
@@ -69,9 +69,9 @@ class CSVData(
   def this() = this("", "", 0)
 }
 
-case class Scores(val playerId: String, val numOfPlaying: Int, total: Double) {
+case class Scores(playerId: String, numOfPlaying: Int, total: Double) {
   // 1度だけ計算するためにlazyをつけている。1度呼び出したら再計算されないので注意。
-  lazy val meanScore = Math.round(total / numOfPlaying).toInt
+  lazy val meanScore: Int = Math.round(total / numOfPlaying).toInt
 
   // Scoresクラスは、immutable。新しい値を設定したScoresを返す。
   def addScore(score: Int): Scores = {
