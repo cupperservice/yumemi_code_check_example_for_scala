@@ -31,7 +31,7 @@ object Main extends Ranking {
         println(s"$rank,${scores.playerId},${scores.meanScore}")
       })
     } catch {
-      case e =>
+      case e: Throwable =>
         e.printStackTrace()
     }
 
