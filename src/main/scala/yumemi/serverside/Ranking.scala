@@ -21,7 +21,7 @@ object Main extends Ranking {
 
     try {
       // 2つの関数(processFile, extractTop10)を合成した関数に処理対象のファイルを渡して呼び出している
-      val results = (processFile _ andThen extractTop10) (reader)
+      val results = (processFile _ andThen extractTop10)(reader)
 
       // ヘッダーの出力
       println("rank,player_id,mean_score")
@@ -40,6 +40,7 @@ object Main extends Ranking {
 }
 
 trait Ranking {
+  val MAX_RANKING = 10
   type T = Map[String, Scores]
 
   def processFile(reader: CSVReader): T = {
@@ -71,7 +72,7 @@ trait Ranking {
     def _extractTop10(rank: Int, top10: List[(Int, Scores)], others: List[Scores]): List[(Int, Scores)] = {
       val lastMeanScore = if (top10.isEmpty) Int.MaxValue else top10.last._2.meanScore
       others match {
-        case head :: tail if top10.size <= 10 || head.meanScore == lastMeanScore =>
+        case head :: tail if top10.size <= MAX_RANKING || head.meanScore == lastMeanScore =>
           val nextRank = if (head.meanScore < lastMeanScore) top10.size + 1 else rank
           _extractTop10(nextRank, top10 :+ (nextRank, head), tail)
         case Nil => top10

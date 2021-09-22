@@ -1,8 +1,7 @@
 package yumemi.serverside
 
 import com.opencsv.{CSVParserBuilder, CSVReaderBuilder}
-import org.scalatest.{AsyncFlatSpec, AsyncFunSpec}
-import yumemi.serverside.Main.processFile
+import org.scalatest.AsyncFlatSpec
 
 import java.io.{File, FileReader}
 
