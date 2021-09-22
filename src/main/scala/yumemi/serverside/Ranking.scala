@@ -1,11 +1,8 @@
 package yumemi.serverside
 
+import com.opencsv.{CSVParserBuilder, CSVReaderBuilder, CSVReader}
 import java.io.FileReader
-import java.io.File
-import com.opencsv.bean.CsvToBeanBuilder
-import com.opencsv.bean.CsvBindByName
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
 
 object Main extends Ranking {
   def main(args: Array[String]): Unit = {
@@ -16,30 +13,54 @@ object Main extends Ranking {
       throw new IllegalArgumentException
     }
 
-    // ヘッダーの出力
-    println("rank,player_id,mean_score")
+    // CSVファイルの読み込みにはOpenCSVを使用する
+    val reader = new CSVReaderBuilder(new FileReader(fileName))
+      .withCSVParser(new CSVParserBuilder().withSeparator(',').build())
+      .withSkipLines(1)
+      .build()
 
-    // 2つの関数(processFile, extractTop10)を合成した関数に処理対象のファイルを渡して呼び出している
-    (processFile _ andThen extractTop10)(new File(fileName)).foreach(ranking => {
-      val (rank, scores) = ranking // Tuple2の要素をパターンマッチで抽出
-      println(s"$rank,${scores.playerId},${scores.meanScore}")
-    })
+    try {
+      // 2つの関数(processFile, extractTop10)を合成した関数に処理対象のファイルを渡して呼び出している
+      val results = (processFile _ andThen extractTop10) (reader)
+
+      // ヘッダーの出力
+      println("rank,player_id,mean_score")
+
+      results.foreach(ranking => {
+        val (rank, scores) = ranking // Tuple2の要素をパターンマッチで抽出
+        println(s"$rank,${scores.playerId},${scores.meanScore}")
+      })
+    } catch {
+      case e =>
+        e.printStackTrace()
+    }
+
+    reader.close()
   }
 }
 
 trait Ranking {
-  def processFile(csvFile: File): Map[String, Scores] = {
-    // CSVファイルの読み込みにはOpenCSVを使用する
-    val reader = new CsvToBeanBuilder[CSVData](new FileReader(csvFile)).withType(classOf[CSVData]).build()
+  type T = Map[String, Scores]
+
+  def processFile(reader: CSVReader): T = {
+    @tailrec // 末尾再帰
+    def totalScore(z: T, op: (T, CSVData) => T): T = {
+      val line = reader.readNext()
+      if (line == null) {
+        z
+      } else {
+        totalScore(op(z, CSVData(line(0), line(1), line(2).toInt)), op)
+      }
+    }
 
     // Playerごとにスコアを合計していく
-    reader.asScala.foldLeft(Map[String, Scores]()) { (playingRecord, data) =>
-      val scores = playingRecord.get(data.player_id) match {
+    totalScore(Map[String, Scores](), (playingRecord, data) => {
+      val scores = playingRecord.get(data.playerId) match {
         case Some(scores) => scores.addScore(data.score)
-        case None => Scores(data.player_id, 1, data.score)
+        case None => Scores(data.playerId, 1, data.score)
       }
       playingRecord + (scores.playerId -> scores)
-    }
+    })
   }
 
   def extractTop10(playingRecords: Map[String, Scores]): List[(Int, Scores)] = {
@@ -56,18 +77,12 @@ trait Ranking {
         case Nil => top10
       }
     }
+
     _extractTop10(0, List(), sortedPlayingRecords)
   }
 }
 
-class CSVData(
-               @CsvBindByName(column = "create_timestamp") val create_timestamp: String,
-               @CsvBindByName(column = "player_id") val player_id: String,
-               @CsvBindByName(column = "score") val score: Int) {
-
-  // OpenCSVで使うためにデフォルトコンストラクタが必要
-  def this() = this("", "", 0)
-}
+case class CSVData(createTimestamp: String, playerId: String, score: Int)
 
 case class Scores(playerId: String, numOfPlaying: Int, total: Double) {
   // 1度だけ計算するためにlazyをつけている。1度呼び出したら再計算されないので注意。
